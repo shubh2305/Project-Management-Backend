@@ -73,7 +73,7 @@ msgpack==1.0.2
 mypy==0.910
 mypy-extensions==0.4.3
 mysql-connector-python==8.0.23
-mysqlclient @ file:///C:/Users/Admin/OneDrive/Desktop/Web%20Development/Django_Projects/server/mysqlclient-1.4.6-cp39-cp39-win_amd64.whl
+mysqlclient 
 nbclassic==0.2.7
 nbclient==0.5.3
 nbconvert==6.0.7
