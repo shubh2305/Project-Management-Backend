@@ -91,10 +91,10 @@ WSGI_APPLICATION = 'server.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'test',
-        'USER': 'root',
-        'PASSWORD': '',
-        'HOST': 'localhost',
+        'NAME': 'bzykytbhjrvz2wnzn7yd',
+        'USER': 'uxqbrz6ni8nauo1a',
+        'PASSWORD': 'E9CTTa70Fx0j4JHBzBH6',
+        'HOST': 'bzykytbhjrvz2wnzn7yd-mysql.services.clever-cloud.com',
         'PORT': '3306',
     }
 }
