@@ -1,0 +1,72 @@
+from django.utils.encoding import force_text
+
+from rest_framework import serializers, status
+from rest_framework.exceptions import APIException
+
+from .models import User, Task
+
+class CustomException(APIException):
+  status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+  defaul_detail = 'Server Error'
+
+  def __init__(self, detail, field, status_code):
+    if status_code is not None:self.status_code = status_code
+    if detail is not None:
+        self.detail = {field: force_text(detail)}
+    else: self.detail = {'detail': force_text(self.default_detail)}
+
+class UserSerializer(serializers.ModelSerializer):
+  email = serializers.CharField()
+  class Meta:
+    model = User
+    fields = ['id', 'password', 'email', 'first_name', 'last_name']
+
+  def create(self, validated_data):
+    user = User(
+      email=validated_data['email'],
+      first_name=validated_data['first_name'],
+      last_name=validated_data['last_name']
+    )
+    user.set_password(validated_data['password'])
+    user.save()
+    return user
+
+  def validate_email(self, email):
+
+    if User.objects.filter(email=email).exists():
+      raise CustomException(f'User with email {email} already exists', 'email', status.HTTP_400_BAD_REQUEST)
+
+    return email
+
+class TaskSerializer(serializers.ModelSerializer):
+  class Meta:
+    model = Task
+    fields = '__all__'
+
+  def create(self, validated_data):
+    email, title = validated_data.get('email'), validated_data.get('title')
+
+    user = User.objects.get(email=email)
+
+    task = Task(
+      title=title,
+      description=validated_data.get('description'),
+      assigned_to=user,
+    )
+    task.save()
+
+    return task
+
+  def validate(self, data):
+    email = data.get('email')
+    if email is None: 
+      raise CustomException(f'Email is required', 'assigned_to', status.HTTP_400_BAD_REQUEST)
+
+    if User.objects.filter(email=email).exists():
+      raise CustomException(f'User with {email} does not exists', 'assigned_to', status.HTTP_400_BAD_REQUEST)
+
+    title = data.get('title')
+    if title is None:
+      raise CustomException('Title is required', 'title', status.HTTP_400_BAD_REQUEST)
+
+    return data
