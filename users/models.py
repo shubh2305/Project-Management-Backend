@@ -66,8 +66,18 @@ class Task(models.Model):
   date_created = models.DateTimeField(auto_now_add=True)
   date_finished = models.DateTimeField(null=True, blank=True)
 
-  def __str__(self):
+  def __str__(self) -> str:
     return self.title
 
 
+class Project(models.Model):
+  manager = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)
+  name = models.CharField(max_length=300, null=True)
+  description = models.TextField(null=True, blank=True)
+  members = models.ManyToManyField(User, related_name='developers')
+  tasks = models.ManyToManyField(Task)
+  date_created = models.DateTimeField(auto_now_add=True)
+
+  def __str__(self) -> str:
+    return self.name
     
