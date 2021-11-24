@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import User, Task, Project
 from .serializers import UserSerializer, TaskSerializer, ProjectSerializer
 
+# Generate tokens for user
 def get_tokens_for_user(user):
   refresh = RefreshToken.for_user(user)
 
@@ -18,9 +19,11 @@ def get_tokens_for_user(user):
     'access': str(refresh.access_token),
   }
 
-def serialize(model_list, Serializer):
-  serialized = [Serializer(model).data for model in model_list]
+# serializing list of model objects
+def serialize(model_list, Serializer, context=None):
+  serialized = [Serializer(model, context=context).data for model in model_list]
   return serialized
+
 
 class RegisterAPIView(APIView):
 
@@ -63,6 +66,7 @@ class LoginAPIView(APIView):
     # except:
     #   return Response({'error': f'User with email {email} does not exists!'}, status=status.HTTP_400_BAD_REQUEST)
 
+
 class LogoutAPIView(APIView):
 
   def post(self, request, *args, **kwargs):
@@ -95,12 +99,14 @@ class GoogleSignInView(APIView):
     except: 
       return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 class ProtectedView(APIView):
   permission_classes = [IsAuthenticated]
   
   def get(self, request, *args, **kwargs):
     qs = User.objects.all()
     return Response(qs.values('id', 'email', 'first_name', 'last_name', 'date_created'))
+
 
 class TaskCreateView(APIView):
 
@@ -122,7 +128,7 @@ class TaskCreateView(APIView):
     serializer = TaskSerializer(data=data)
 
     if serializer.is_valid(raise_exception=True):
-      serializer.save()
+      # serializer.save()
       return Response({'message': 'Task was created'}, status=status.HTTP_200_OK)
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -146,18 +152,28 @@ class UserProfileView(APIView):
   def get(self, request, *args, **kwargs):
     id = kwargs.pop('pk', None)
     try:
-      user = User.objects.get(id=id)
-      tasks = Task.objects.filter(assigned_to=id)
-      projects = Project.objects.filter(members__id=id)
-      response = UserSerializer(user).data
+      user: User = User.objects.get(id=id)
+      print('[This asshole]', user)
+      # tasks = Task.objects.filter(assigned_to=id)
+      projects: list[Project] = Project.objects.filter(members__id=id)
+      print(projects)
 
-      response['tasks'] = serialize(tasks, TaskSerializer)
-      response['projects'] = serialize(projects, ProjectSerializer)
+      response: dict = UserSerializer(user).data
+      temp = []
+      for project in projects:
+        user_project = ProjectSerializer(project).data
+        user_tasks = project.tasks.all().filter(assigned_to=user)
+        user_project['tasks'] = serialize(user_tasks, TaskSerializer, context={'project_id': project.id})
+        
+        temp.append(user_project)
+        
+      response['projects'] = temp
       return Response(response, status=status.HTTP_200_OK)
 
     except Exception as e:
       print(e)
       return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class ProjectView(APIView):
 
