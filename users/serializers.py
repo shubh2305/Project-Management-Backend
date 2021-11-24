@@ -42,40 +42,6 @@ class UserSerializer(serializers.ModelSerializer):
     return email
 
 
-class TaskSerializer(serializers.ModelSerializer):
-  class Meta:
-    model = Task
-    fields = '__all__'
-
-  def create(self, validated_data):
-    email, title = validated_data.get('email'), validated_data.get('title')
-
-    user = User.objects.get(email=email)
-
-    task = Task(
-      title=title,
-      description=validated_data.get('description'),
-      assigned_to=user,
-    )
-    task.save()
-
-    return task
-
-  def validate(self, data):
-    email = data.get('email')
-    if email is None: 
-      raise CustomException(f'Email is required', 'assigned_to', status.HTTP_400_BAD_REQUEST)
-
-    if User.objects.filter(email=email).exists():
-      raise CustomException(f'User with {email} does not exists', 'assigned_to', status.HTTP_400_BAD_REQUEST)
-
-    title = data.get('title')
-    if title is None:
-      raise CustomException('Title is required', 'title', status.HTTP_400_BAD_REQUEST)
-
-    return data
-
-
 class ProjectSerializer(serializers.ModelSerializer):
 
   class Meta:
@@ -102,3 +68,52 @@ class ProjectSerializer(serializers.ModelSerializer):
     project.members.add(user)
 
     return project
+
+
+class TaskSerializer(serializers.ModelSerializer):
+  project_id = serializers.SerializerMethodField('get_project_id')
+
+  class Meta:
+    model = Task
+    fields = '__all__'
+
+  def get_project_id(self, obj):
+    project_id = self.context.get('project_id')
+    if project_id:
+      return project_id if Project.objects.filter(id=project_id).exists() else None
+
+  def create(self, validated_data):
+    print('[This is line 82, serializers.py]', validated_data)
+    # email, title = validated_data.get('email'), validated_data.get('title')
+
+    # user = User.objects.get(email=email)
+
+    # task = Task(
+    #   title=title,
+    #   description=validated_data.get('description'),
+    #   assigned_to=user,
+    # )
+    # task.save()
+
+    # return task
+
+  def validate(self, data):
+    self.project_id = data.get('project_id')
+    title = data.get('title')
+    assigned_to = data.get('assigned_to')
+    print(assigned_to)
+    print('[This is line 99, serializers.py]', data)
+    project = Project.objects.filter(id=self.project_id).first()
+    print(project)
+    # email = data.get('email')
+    # if email is None: 
+    #   raise CustomException(f'Email is required', 'assigned_to', status.HTTP_400_BAD_REQUEST)
+
+    # if User.objects.filter(email=email).exists():
+    #   raise CustomException(f'User with {email} does not exists', 'assigned_to', status.HTTP_400_BAD_REQUEST)
+
+    # title = data.get('title')
+    # if title is None:
+    #   raise CustomException('Title is required', 'title', status.HTTP_400_BAD_REQUEST)
+
+    return data
