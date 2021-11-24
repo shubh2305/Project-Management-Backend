@@ -19,7 +19,7 @@ def get_tokens_for_user(user):
     'access': str(refresh.access_token),
   }
 
-# serializing list of model objects
+# serializing list of model objects into dictionaries 
 def serialize(model_list, Serializer, context=None):
   serialized = [Serializer(model, context=context).data for model in model_list]
   return serialized
@@ -29,7 +29,7 @@ class RegisterAPIView(APIView):
 
   def post(self, request, *args, **kwargs):
     data = request.data
-
+    # user = User.objects.get(id=1)
     serializer = UserSerializer(data=data)
 
     if serializer.is_valid(raise_exception=True):
@@ -96,8 +96,8 @@ class GoogleSignInView(APIView):
       tokens['user'] = user_data
 
       return Response(tokens, status=status.HTTP_200_OK)
-    except: 
-      return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e: 
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ProtectedView(APIView):
@@ -110,25 +110,13 @@ class ProtectedView(APIView):
 
 class TaskCreateView(APIView):
 
-  def get(self, request, *args, **kwargs):
-    tasks = list(Task.objects.values())
-    try:
-      for task in tasks:
-        user_id = task.pop('assigned_to_id', None)
-        user = User.objects.get(id=user_id)
-        task['user'] = UserSerializer(user).data
-      return Response(tasks, status=status.HTTP_200_OK)
-    except Exception: 
-      return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
   def post(self, request, *args, **kwargs):
     data = request.data
 
     serializer = TaskSerializer(data=data)
 
     if serializer.is_valid(raise_exception=True):
-      # serializer.save()
+      serializer.save()
       return Response({'message': 'Task was created'}, status=status.HTTP_200_OK)
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -139,12 +127,15 @@ class IndividualTaskView(APIView):
   def get(self, request, *args, **kwargs):
     id = kwargs.pop('pk', None)
     try:
-      projects = Project.objects.filter(tasks__id=id)
-      print(projects)
-      return Response(status=status.HTTP_200_OK)
+      project: Project = Project.objects.filter(tasks__id=id).first()
+      task: Task = Task.objects.filter(id=id).first()
+      
+      response: Response = TaskSerializer(task, context={'project_id': project.id}).data
+      response['project'] = ProjectSerializer(project).data
+      return Response(response, status=status.HTTP_200_OK)
     except Exception as e:
       print(e)
-      return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UserProfileView(APIView):
@@ -153,15 +144,12 @@ class UserProfileView(APIView):
     id = kwargs.pop('pk', None)
     try:
       user: User = User.objects.get(id=id)
-      print('[This asshole]', user)
-      # tasks = Task.objects.filter(assigned_to=id)
       projects: list[Project] = Project.objects.filter(members__id=id)
-      print(projects)
 
       response: dict = UserSerializer(user).data
-      temp = []
+      temp: list = []
       for project in projects:
-        user_project = ProjectSerializer(project).data
+        user_project: list = ProjectSerializer(project).data
         user_tasks = project.tasks.all().filter(assigned_to=user)
         user_project['tasks'] = serialize(user_tasks, TaskSerializer, context={'project_id': project.id})
         
@@ -172,7 +160,7 @@ class UserProfileView(APIView):
 
     except Exception as e:
       print(e)
-      return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ProjectView(APIView):
@@ -198,7 +186,7 @@ class ProjectView(APIView):
       return Response(response, status=status.HTTP_200_OK)
     except Exception as e:
       print(e)
-      return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
   def post(self, request, *args, **kwargs):
     data = request.data

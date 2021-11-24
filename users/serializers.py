@@ -14,7 +14,7 @@ class CustomException(APIException):
   def __init__(self, detail, field, status_code):
     if status_code is not None:self.status_code = status_code
     if detail is not None:
-        self.detail = {field: force_text(detail)}
+      self.detail = {field: force_text(detail)}
     else: self.detail = {'detail': force_text(self.default_detail)}
 
 
@@ -72,6 +72,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 class TaskSerializer(serializers.ModelSerializer):
   project_id = serializers.SerializerMethodField('get_project_id')
+  id_project = serializers.IntegerField()
 
   class Meta:
     model = Task
@@ -83,37 +84,23 @@ class TaskSerializer(serializers.ModelSerializer):
       return project_id if Project.objects.filter(id=project_id).exists() else None
 
   def create(self, validated_data):
-    print('[This is line 82, serializers.py]', validated_data)
-    # email, title = validated_data.get('email'), validated_data.get('title')
+    print('[This is line 87, serializers.py]', validated_data)
 
-    # user = User.objects.get(email=email)
+    project = Project.objects.get(id=self.id_project)
 
-    # task = Task(
-    #   title=title,
-    #   description=validated_data.get('description'),
-    #   assigned_to=user,
-    # )
-    # task.save()
+    task = Task.objects.create(**validated_data)
 
-    # return task
+    project.tasks.add(task)
+
+    return task
 
   def validate(self, data):
-    self.project_id = data.get('project_id')
+    self.id_project = data.pop('id_project', None)
     title = data.get('title')
-    assigned_to = data.get('assigned_to')
-    print(assigned_to)
-    print('[This is line 99, serializers.py]', data)
-    project = Project.objects.filter(id=self.project_id).first()
-    print(project)
-    # email = data.get('email')
-    # if email is None: 
-    #   raise CustomException(f'Email is required', 'assigned_to', status.HTTP_400_BAD_REQUEST)
+    if not title:
+      raise CustomException(f'Title for the task is required', 'title', status.HTTP_400_BAD_REQUEST)
 
-    # if User.objects.filter(email=email).exists():
-    #   raise CustomException(f'User with {email} does not exists', 'assigned_to', status.HTTP_400_BAD_REQUEST)
-
-    # title = data.get('title')
-    # if title is None:
-    #   raise CustomException('Title is required', 'title', status.HTTP_400_BAD_REQUEST)
+    if not Project.objects.filter(id=self.id_project).exists():
+      raise CustomException(f'Project with given id does not exist', 'id_project', status.HTTP_400_BAD_REQUEST)
 
     return data
