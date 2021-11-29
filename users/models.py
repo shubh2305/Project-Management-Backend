@@ -81,3 +81,14 @@ class Project(models.Model):
   def __str__(self) -> str:
     return self.name
     
+
+class Document(models.Model):
+  created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+  title = models.CharField(max_length=500)
+  file = models.FileField(upload_to='documents/')
+  uploaded_at = models.DateTimeField(auto_now_add=True)
+
+  def __str__(self) -> str:
+    return self.title
+
+  
