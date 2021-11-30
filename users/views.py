@@ -5,10 +5,10 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 
 from .models import User, Task, Project
-from .serializers import UserSerializer, TaskSerializer, ProjectSerializer
+from .serializers import DocumentSerializer, UserSerializer, TaskSerializer, ProjectSerializer, CustomException
 
 # Generate tokens for user
 def get_tokens_for_user(user):
@@ -201,4 +201,20 @@ class ProjectView(APIView):
 
     except Exception as e:
       print('[This is line 186,  views.py]', e)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DocumentAPIView(APIView):
+
+  def post(self, request, *args, **kwargs):
+    data = request.data
+    try:
+      serializer = DocumentSerializer(data=data)
+      if serializer.is_valid(raise_exception=True):
+        serializer.save()
+        return Response('Document Received')
+      return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except CustomException as ce:
+      return Response(ce.__dict__, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
       return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

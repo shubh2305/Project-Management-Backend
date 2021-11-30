@@ -69,7 +69,6 @@ class Task(models.Model):
   def __str__(self) -> str:
     return self.title
 
-
 class Project(models.Model):
   manager = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)
   name = models.CharField(max_length=300, null=True)
@@ -80,9 +79,9 @@ class Project(models.Model):
 
   def __str__(self) -> str:
     return self.name
-    
 
 class Document(models.Model):
+  project_id = models.ForeignKey(Project, on_delete=models.CASCADE, null=True)
   created_by = models.ForeignKey(User, on_delete=models.CASCADE)
   title = models.CharField(max_length=500)
   file = models.FileField(upload_to='documents/')
@@ -90,5 +89,8 @@ class Document(models.Model):
 
   def __str__(self) -> str:
     return self.title
+
+    
+
 
   

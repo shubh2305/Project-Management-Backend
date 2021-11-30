@@ -11,7 +11,8 @@ from .views import  (
   TaskCreateView,
   UserProfileView,
   ProjectView,
-  IndividualTaskView
+  IndividualTaskView,
+  DocumentAPIView
 )
 
 urlpatterns = [
@@ -26,8 +27,8 @@ urlpatterns = [
   path('<int:pk>/', UserProfileView.as_view()),
   path('project/<int:pk>/', ProjectView.as_view()),
   path('project/', ProjectView.as_view()),
-  path('task/<int:pk>/', IndividualTaskView.as_view())
+  path('task/<int:pk>/', IndividualTaskView.as_view()),
+  path('document/', DocumentAPIView.as_view())
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+

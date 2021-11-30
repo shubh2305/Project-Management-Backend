@@ -3,9 +3,7 @@ from django.utils.encoding import force_text
 from rest_framework import serializers, status
 from rest_framework.exceptions import APIException
 
-from .models import User, Task, Project
-
-import json
+from .models import Document, User, Task, Project, Document
 
 class CustomException(APIException):
   status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -104,3 +102,21 @@ class TaskSerializer(serializers.ModelSerializer):
       raise CustomException(f'Project with given id does not exist', 'id_project', status.HTTP_400_BAD_REQUEST)
 
     return data
+
+
+class DocumentSerializer(serializers.ModelSerializer):
+  class Meta:
+    model = Document
+    fields = '__all__'
+
+  def create(self, validated_data):
+    return Document.objects.create(**validated_data)
+
+  def validate(self, attrs):
+    project: Project = attrs.get('project_id')
+    created_by: User = attrs.get('created_by')
+    # user: list[User] = Project.objects.filter(members=created_by)
+    if not project.members.filter(id=created_by.id).exists():
+      raise CustomException(f'User {created_by} is not a member of {project}', 'project_id', status.HTTP_400_BAD_REQUEST)
+    return attrs 
+  
