@@ -58,8 +58,19 @@ class User(AbstractBaseUser):
     return True
 
 
+class Project(models.Model):
+  manager = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)
+  name = models.CharField(max_length=300, null=True)
+  description = models.TextField(null=True, blank=True)
+  members = models.ManyToManyField(User, related_name='developers')
+  date_created = models.DateTimeField(auto_now_add=True)
+
+  def __str__(self) -> str:
+    return self.name
+
 class Task(models.Model):
   assigned_to = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)
+  project_id = models.ForeignKey(Project, on_delete=models.CASCADE, null=True)
   title = models.CharField(max_length=500, null=True)
   description = models.TextField(null=True, blank=True)
   done = models.BooleanField(default=False)
@@ -68,17 +79,6 @@ class Task(models.Model):
 
   def __str__(self) -> str:
     return self.title
-
-class Project(models.Model):
-  manager = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)
-  name = models.CharField(max_length=300, null=True)
-  description = models.TextField(null=True, blank=True)
-  members = models.ManyToManyField(User, related_name='developers')
-  tasks = models.ManyToManyField(Task)
-  date_created = models.DateTimeField(auto_now_add=True)
-
-  def __str__(self) -> str:
-    return self.name
 
 class Document(models.Model):
   project_id = models.ForeignKey(Project, on_delete=models.CASCADE, null=True)

@@ -69,39 +69,20 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class TaskSerializer(serializers.ModelSerializer):
-  project_id = serializers.SerializerMethodField('get_project_id')
-  id_project = serializers.IntegerField()
 
   class Meta:
     model = Task
     fields = '__all__'
 
-  def get_project_id(self, obj):
-    project_id = self.context.get('project_id')
-    if project_id:
-      return project_id if Project.objects.filter(id=project_id).exists() else None
-
   def create(self, validated_data):
-    print('[This is line 87, serializers.py]', validated_data)
+    return Task.objects.create(**validated_data)
 
-    project = Project.objects.get(id=self.id_project)
-
-    task = Task.objects.create(**validated_data)
-
-    project.tasks.add(task)
-
-    return task
-
-  def validate(self, data):
-    self.id_project = data.pop('id_project', None)
-    title = data.get('title')
-    if not title:
-      raise CustomException(f'Title for the task is required', 'title', status.HTTP_400_BAD_REQUEST)
-
-    if not Project.objects.filter(id=self.id_project).exists():
-      raise CustomException(f'Project with given id does not exist', 'id_project', status.HTTP_400_BAD_REQUEST)
-
-    return data
+  def validate(self, attrs):
+    project: Project = attrs.get('project_id')
+    assigned_to: User = attrs.get('assigned_to')
+    if not project.members.filter(id=assigned_to.id).exists():
+      raise CustomException(f'User {assigned_to} is not a member of {project}', 'project_id', status.HTTP_400_BAD_REQUEST)
+    return attrs
 
 
 class DocumentSerializer(serializers.ModelSerializer):
@@ -115,7 +96,6 @@ class DocumentSerializer(serializers.ModelSerializer):
   def validate(self, attrs):
     project: Project = attrs.get('project_id')
     created_by: User = attrs.get('created_by')
-    # user: list[User] = Project.objects.filter(members=created_by)
     if not project.members.filter(id=created_by.id).exists():
       raise CustomException(f'User {created_by} is not a member of {project}', 'project_id', status.HTTP_400_BAD_REQUEST)
     return attrs 

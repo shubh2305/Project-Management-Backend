@@ -112,15 +112,18 @@ class TaskCreateView(APIView):
 
   def post(self, request, *args, **kwargs):
     data = request.data
+    try:
+      serializer = TaskSerializer(data=data)
 
-    serializer = TaskSerializer(data=data)
+      if serializer.is_valid(raise_exception=True):
+        serializer.save()
+        return Response({'message': 'Task was created'}, status=status.HTTP_200_OK)
 
-    if serializer.is_valid(raise_exception=True):
-      serializer.save()
-      return Response({'message': 'Task was created'}, status=status.HTTP_200_OK)
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+      return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except CustomException as ce:
+      return Response(ce.__dict__, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class IndividualTaskView(APIView):
 
@@ -150,8 +153,8 @@ class UserProfileView(APIView):
       temp: list = []
       for project in projects:
         user_project: list = ProjectSerializer(project).data
-        user_tasks = project.tasks.all().filter(assigned_to=user)
-        user_project['tasks'] = serialize(user_tasks, TaskSerializer, context={'project_id': project.id})
+        user_tasks = Task.objects.filter(project_id=project, assigned_to=user)
+        user_project['tasks'] = serialize(user_tasks, TaskSerializer)
         
         temp.append(user_project)
         
@@ -173,7 +176,7 @@ class ProjectView(APIView):
       
       manager = project.manager
       members = project.members.all()
-      tasks = project.tasks.all()
+      tasks = Task.objects.filter(project_id=project)
 
       members_serialized = serialize(members, UserSerializer)
       tasks_serialized = serialize(tasks, TaskSerializer)

@@ -9,7 +9,7 @@ class UserAdmin(admin.ModelAdmin):
 
 class TaskAdmin(admin.ModelAdmin):
   model = Task
-  list_display = ['id', 'title', 'assigned_to', 'done']
+  list_display = ['id', 'title', 'project_id', 'assigned_to', 'done']
 
 class ProjectAdmin(admin.ModelAdmin):
   model = Project
