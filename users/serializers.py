@@ -5,6 +5,8 @@ from rest_framework.exceptions import APIException
 
 from .models import Document, User, Task, Project, Document
 
+import datetime
+
 class CustomException(APIException):
   status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
   default_detail = 'Server Error'
@@ -31,6 +33,13 @@ class UserSerializer(serializers.ModelSerializer):
     user.set_password(validated_data['password'])
     user.save()
     return user
+  
+  def update(self, instance, validated_data):
+    instance.email = validated_data.get('email', instance.email)
+    instance.first_name = validated_data.get('first_name', instance.first_name)
+    instance.last_name = validated_data.get('last_name', instance.last_name)
+    instance.save()
+    return instance
 
   def validate_email(self, email):
 
@@ -68,6 +77,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     return project
 
 
+
 class TaskSerializer(serializers.ModelSerializer):
 
   class Meta:
@@ -78,12 +88,28 @@ class TaskSerializer(serializers.ModelSerializer):
     return Task.objects.create(**validated_data)
 
   def validate(self, attrs):
-    project: Project = attrs.get('project_id')
+    project: Project = attrs.get('project_id', None)
+    if project is None:
+      return attrs
     assigned_to: User = attrs.get('assigned_to')
     if not project.members.filter(id=assigned_to.id).exists():
       raise CustomException(f'User {assigned_to} is not a member of {project}', 'project_id', status.HTTP_400_BAD_REQUEST)
     return attrs
 
+  def update(self, instance, validated_data):
+    completed = validated_data.pop("done", None)
+    if completed:
+      instance.date_finished = datetime.datetime.now()
+      instance.done = True
+    else:
+      instance.date_finished = None
+      instance.done = False
+    
+    instance.title = validated_data.get("title", instance.title)
+    instance.description = validated_data.get("description", instance.description)
+    instance.assigned_to = validated_data.get("assigned_to", instance.assigned_to)
+    
+    return instance
 
 class DocumentSerializer(serializers.ModelSerializer):
   class Meta:

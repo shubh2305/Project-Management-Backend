@@ -12,7 +12,8 @@ from .views import  (
   UserProfileView,
   ProjectView,
   IndividualTaskView,
-  DocumentAPIView
+  DocumentAPIView,
+  IndividualDocumentAPIView
 )
 
 urlpatterns = [
@@ -28,7 +29,8 @@ urlpatterns = [
   path('project/<int:pk>/', ProjectView.as_view()),
   path('project/', ProjectView.as_view()),
   path('task/<int:pk>/', IndividualTaskView.as_view()),
-  path('document/', DocumentAPIView.as_view())
+  path('document/', DocumentAPIView.as_view()),
+  path('document/<int:pk>/', IndividualDocumentAPIView.as_view())
 ]
 
 
