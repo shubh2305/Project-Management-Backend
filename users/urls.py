@@ -11,6 +11,7 @@ from .views import  (
   TaskCreateView,
   UserProfileView,
   ProjectView,
+  IndividualProjectView,
   IndividualTaskView,
   DocumentAPIView,
   IndividualDocumentAPIView
@@ -26,7 +27,7 @@ urlpatterns = [
   path('', ProtectedView.as_view()),
   path('create-task/', TaskCreateView.as_view()),
   path('<int:pk>/', UserProfileView.as_view()),
-  path('project/<int:pk>/', ProjectView.as_view()),
+  path('project/<int:pk>/', IndividualProjectView.as_view()),
   path('project/', ProjectView.as_view()),
   path('task/<int:pk>/', IndividualTaskView.as_view()),
   path('document/', DocumentAPIView.as_view()),

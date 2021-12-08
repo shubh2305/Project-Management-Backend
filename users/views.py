@@ -2,13 +2,22 @@ from django.forms.models import model_to_dict
 from django.core import serializers
 
 from rest_framework import status
+from rest_framework import response
+from rest_framework.utils.serializer_helpers import ReturnDict
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 
 from .models import Document, User, Task, Project
-from .serializers import DocumentSerializer, UserSerializer, TaskSerializer, ProjectSerializer, CustomException
+from .serializers import (
+  DocumentSerializer,
+  UserSerializer, 
+  TaskSerializer, 
+  ProjectSerializer, 
+  CustomException,
+  ProjectUpdateSerializer
+)
 
 # Generate tokens for user
 def get_tokens_for_user(user):
@@ -20,16 +29,18 @@ def get_tokens_for_user(user):
   }
 
 # serializing list of model objects into dictionaries 
-def serialize(model_list, Serializer, context=None):
-  serialized = [Serializer(model, context=context).data for model in model_list]
+def serialize(model_list, Serializer):
+  serialized = [Serializer(model).data for model in model_list]
   return serialized
 
 
 def update(data, instance, Serializer) -> Response:
+  print(data)
   serializer = Serializer(instance, data=data, partial=True)
+
+  print(data)
   if serializer.is_valid(raise_exception=True):
     serializer.save()
-    print("save serializer")
     return Response(serializer.data, status=status.HTTP_200_OK)
   return Response(serializer.error, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -194,38 +205,17 @@ class UserProfileView(APIView):
 
 class ProjectView(APIView):
 
-  def get(self, request, *args, **kwargs):
-    id = kwargs.pop('pk', None)
-    try:
-      project = Project.objects.filter(id=id).first()
-      response = ProjectSerializer(project).data
-      
-      manager = project.manager
-      members = project.members.all()
-      tasks = Task.objects.filter(project_id=project)
-      documents = Document.objects.filter(project_id=project)
-
-      members_serialized = serialize(members, UserSerializer)
-      tasks_serialized = serialize(tasks, TaskSerializer)
-      documents_serialized = serialize(documents, DocumentSerializer)
-
-      response['manager'] = UserSerializer(manager).data
-      response['members'] = members_serialized
-      response['tasks'] = tasks_serialized
-      response['documents'] = documents_serialized
-
-      return Response(response, status=status.HTTP_200_OK)
-    except Exception as e:
-      print(e)
-      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+  
   def post(self, request, *args, **kwargs):
     data = request.data
 
     try:
+      print(data)
       serializer = ProjectSerializer(data=data)
+
       if serializer.is_valid(raise_exception=True):
-        serializer.save()
+        # serializer.save()
+        print("Save serializer")
         return Response({'message': 'Project was created'}, status=status.HTTP_200_OK)
 
       return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -234,6 +224,53 @@ class ProjectView(APIView):
       print('[This is line 186,  views.py]', e)
       return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+
+class IndividualProjectView(APIView):
+  def get(self, request, *args, **kwargs):
+    id = kwargs.pop('pk', None)
+    print(id)
+    try:
+      project: Project = Project.objects.filter(id=id).first()
+      response: ReturnDict = ProjectSerializer(project).data
+      
+      manager: User = project.manager
+      members: list[User] = project.members.all()
+      tasks: list[Task] = Task.objects.filter(project_id=project)
+      documents: list[Document] = Document.objects.filter(project_id=project)
+
+      members_serialized = serialize(members, UserSerializer)
+      documents_serialized = serialize(documents, DocumentSerializer)
+      tasks_serialized = serialize(tasks, TaskSerializer)
+
+      response['manager'] = UserSerializer(manager).data
+      response['members'] = members_serialized
+      response['tasks'] = tasks_serialized
+      response['documents'] = documents_serialized
+      return Response(response, status=status.HTTP_200_OK)
+    except Exception as e:
+      print(e)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+  def patch(self, request, pk):
+    data = request.data
+    try:
+      project: Project = Project.objects.filter(id=pk).first()
+
+      serializer = ProjectUpdateSerializer(project, data=data, fields=list(data.keys()))
+
+      if serializer.is_valid(raise_exception=True):
+        serializer.save()
+        response = ProjectSerializer(project).data
+        manager_id = response.pop("manager")
+        manager = User.objects.filter(id=manager_id).first()
+        response["members"] = serialize(project.members.all(), UserSerializer)
+        response["manager"] = UserSerializer(manager).data
+        return Response(response, status=status.HTTP_200_OK)
+      return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+      print(e)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class DocumentAPIView(APIView):
 
@@ -270,6 +307,19 @@ class IndividualDocumentAPIView(APIView):
       response['created_by'] = user_data
 
       return Response(response, status=status.HTTP_200_OK)
+    except Exception as e:
+      print(e)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+  def patch(self, request, pk):
+    data = request.data
+
+    try:
+      print(data)
+      document = Document.objects.filter(id=pk).first()
+
+      print(data)
+      return update(data, document, DocumentSerializer)
     except Exception as e:
       print(e)
       return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
