@@ -2,13 +2,22 @@ from django.forms.models import model_to_dict
 from django.core import serializers
 
 from rest_framework import status
+from rest_framework import response
+from rest_framework.utils.serializer_helpers import ReturnDict
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 
-from .models import User, Task, Project
-from .serializers import UserSerializer, TaskSerializer, ProjectSerializer
+from .models import Document, User, Task, Project
+from .serializers import (
+  DocumentSerializer,
+  UserSerializer, 
+  TaskSerializer, 
+  ProjectSerializer, 
+  CustomException,
+  ProjectUpdateSerializer
+)
 
 # Generate tokens for user
 def get_tokens_for_user(user):
@@ -19,17 +28,27 @@ def get_tokens_for_user(user):
     'access': str(refresh.access_token),
   }
 
-# serializing list of model objects
-def serialize(model_list, Serializer, context=None):
-  serialized = [Serializer(model, context=context).data for model in model_list]
+# serializing list of model objects into dictionaries 
+def serialize(model_list, Serializer):
+  serialized = [Serializer(model).data for model in model_list]
   return serialized
 
+
+def update(data, instance, Serializer) -> Response:
+  print(data)
+  serializer = Serializer(instance, data=data, partial=True)
+
+  print(data)
+  if serializer.is_valid(raise_exception=True):
+    serializer.save()
+    return Response(serializer.data, status=status.HTTP_200_OK)
+  return Response(serializer.error, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class RegisterAPIView(APIView):
 
   def post(self, request, *args, **kwargs):
     data = request.data
-
+    # user = User.objects.get(id=1)
     serializer = UserSerializer(data=data)
 
     if serializer.is_valid(raise_exception=True):
@@ -96,8 +115,8 @@ class GoogleSignInView(APIView):
       tokens['user'] = user_data
 
       return Response(tokens, status=status.HTTP_200_OK)
-    except: 
-      return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e: 
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ProtectedView(APIView):
@@ -110,41 +129,44 @@ class ProtectedView(APIView):
 
 class TaskCreateView(APIView):
 
-  def get(self, request, *args, **kwargs):
-    tasks = list(Task.objects.values())
-    try:
-      for task in tasks:
-        user_id = task.pop('assigned_to_id', None)
-        user = User.objects.get(id=user_id)
-        task['user'] = UserSerializer(user).data
-      return Response(tasks, status=status.HTTP_200_OK)
-    except Exception: 
-      return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
   def post(self, request, *args, **kwargs):
     data = request.data
+    try:
+      serializer = TaskSerializer(data=data)
 
-    serializer = TaskSerializer(data=data)
+      if serializer.is_valid(raise_exception=True):
+        serializer.save()
+        return Response({'message': 'Task was created'}, status=status.HTTP_200_OK)
 
-    if serializer.is_valid(raise_exception=True):
-      # serializer.save()
-      return Response({'message': 'Task was created'}, status=status.HTTP_200_OK)
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+      return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except CustomException as ce:
+      return Response(ce.__dict__, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class IndividualTaskView(APIView):
 
   def get(self, request, *args, **kwargs):
     id = kwargs.pop('pk', None)
     try:
-      projects = Project.objects.filter(tasks__id=id)
-      print(projects)
-      return Response(status=status.HTTP_200_OK)
+      project: Project = Project.objects.filter(task__id=id).first()
+      task: Task = Task.objects.filter(id=id).first()
+      
+      response: Response = TaskSerializer(task, context={'project_id': project.id}).data
+      response['project'] = ProjectSerializer(project).data
+      return Response(response, status=status.HTTP_200_OK)
     except Exception as e:
       print(e)
-      return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+  def patch(self, request, pk):
+    data = request.data
+    try:
+      task: Task = Task.objects.filter(id=pk).first()
+      return update(data, task, TaskSerializer)
+    except Exception as e:
+      print(e)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UserProfileView(APIView):
@@ -153,17 +175,14 @@ class UserProfileView(APIView):
     id = kwargs.pop('pk', None)
     try:
       user: User = User.objects.get(id=id)
-      print('[This asshole]', user)
-      # tasks = Task.objects.filter(assigned_to=id)
       projects: list[Project] = Project.objects.filter(members__id=id)
-      print(projects)
 
       response: dict = UserSerializer(user).data
-      temp = []
+      temp: list = []
       for project in projects:
-        user_project = ProjectSerializer(project).data
-        user_tasks = project.tasks.all().filter(assigned_to=user)
-        user_project['tasks'] = serialize(user_tasks, TaskSerializer, context={'project_id': project.id})
+        user_project: list = ProjectSerializer(project).data
+        user_tasks = Task.objects.filter(project_id=project, assigned_to=user)
+        user_project['tasks'] = serialize(user_tasks, TaskSerializer)
         
         temp.append(user_project)
         
@@ -172,45 +191,135 @@ class UserProfileView(APIView):
 
     except Exception as e:
       print(e)
-      return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+  def patch(self, request, pk):
+    data = request.data
+    try:
+      user: User = User.objects.filter(id=pk).first()
+      return update(data, user, UserSerializer)
+    except Exception as e:
+      print(e)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ProjectView(APIView):
 
-  def get(self, request, *args, **kwargs):
-    id = kwargs.pop('pk', None)
-    try:
-      project = Project.objects.filter(id=id).first()
-      response = ProjectSerializer(project).data
-      
-      manager = project.manager
-      members = project.members.all()
-      tasks = project.tasks.all()
-
-      members_serialized = serialize(members, UserSerializer)
-      tasks_serialized = serialize(tasks, TaskSerializer)
-      print(response)
-
-      response['manager'] = UserSerializer(manager).data
-      response['members'] = members_serialized
-      response['tasks'] = tasks_serialized
-
-      return Response(response, status=status.HTTP_200_OK)
-    except Exception as e:
-      print(e)
-      return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+  
   def post(self, request, *args, **kwargs):
     data = request.data
 
     try:
+      print(data)
       serializer = ProjectSerializer(data=data)
+
       if serializer.is_valid(raise_exception=True):
-        serializer.save()
+        # serializer.save()
+        print("Save serializer")
         return Response({'message': 'Project was created'}, status=status.HTTP_200_OK)
 
       return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     except Exception as e:
       print('[This is line 186,  views.py]', e)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class IndividualProjectView(APIView):
+  def get(self, request, *args, **kwargs):
+    id = kwargs.pop('pk', None)
+    print(id)
+    try:
+      project: Project = Project.objects.filter(id=id).first()
+      response: ReturnDict = ProjectSerializer(project).data
+      
+      manager: User = project.manager
+      members: list[User] = project.members.all()
+      tasks: list[Task] = Task.objects.filter(project_id=project)
+      documents: list[Document] = Document.objects.filter(project_id=project)
+
+      members_serialized = serialize(members, UserSerializer)
+      documents_serialized = serialize(documents, DocumentSerializer)
+      tasks_serialized = serialize(tasks, TaskSerializer)
+
+      response['manager'] = UserSerializer(manager).data
+      response['members'] = members_serialized
+      response['tasks'] = tasks_serialized
+      response['documents'] = documents_serialized
+      return Response(response, status=status.HTTP_200_OK)
+    except Exception as e:
+      print(e)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+  def patch(self, request, pk):
+    data = request.data
+    try:
+      project: Project = Project.objects.filter(id=pk).first()
+
+      serializer = ProjectUpdateSerializer(project, data=data, fields=list(data.keys()))
+
+      if serializer.is_valid(raise_exception=True):
+        serializer.save()
+        response = ProjectSerializer(project).data
+        manager_id = response.pop("manager")
+        manager = User.objects.filter(id=manager_id).first()
+        response["members"] = serialize(project.members.all(), UserSerializer)
+        response["manager"] = UserSerializer(manager).data
+        return Response(response, status=status.HTTP_200_OK)
+      return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+      print(e)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class DocumentAPIView(APIView):
+
+  def post(self, request, *args, **kwargs):
+    data = request.data
+    try:
+      serializer = DocumentSerializer(data=data)
+      if serializer.is_valid(raise_exception=True):
+        serializer.save()
+        return Response('Document Received')
+      return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except CustomException as ce:
+      return Response(ce.__dict__, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class IndividualDocumentAPIView(APIView):
+  def get(self, request, *args, **kwargs):
+    id: int or None = kwargs.get('pk', None)
+    try:
+      document: Document or None = Document.objects.filter(id=id).first() or None
+      print(document.__class__)
+      if document is None:
+        return Response(f'Document with ID {id} does not exist', status=status.HTTP_400_BAD_REQUEST)
+      response: dict = DocumentSerializer(document).data
+
+      project: Project = Project.objects.filter(id=response.pop('project_id')).first()
+      project_data = ProjectSerializer(project).data
+      response['project'] = project_data
+
+      user: User = User.objects.filter(id=response.pop('created_by')).first()
+      user_data = UserSerializer(user).data
+      response['created_by'] = user_data
+
+      return Response(response, status=status.HTTP_200_OK)
+    except Exception as e:
+      print(e)
+      return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+  def patch(self, request, pk):
+    data = request.data
+
+    try:
+      print(data)
+      document = Document.objects.filter(id=pk).first()
+
+      print(data)
+      return update(data, document, DocumentSerializer)
+    except Exception as e:
+      print(e)
       return Response(e.__dict__, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

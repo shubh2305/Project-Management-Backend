@@ -1,4 +1,6 @@
 from django.urls import path
+from django.conf import settings
+from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 from .views import  (
   LoginAPIView, 
@@ -9,7 +11,10 @@ from .views import  (
   TaskCreateView,
   UserProfileView,
   ProjectView,
-  IndividualTaskView
+  IndividualProjectView,
+  IndividualTaskView,
+  DocumentAPIView,
+  IndividualDocumentAPIView
 )
 
 urlpatterns = [
@@ -22,7 +27,11 @@ urlpatterns = [
   path('', ProtectedView.as_view()),
   path('create-task/', TaskCreateView.as_view()),
   path('<int:pk>/', UserProfileView.as_view()),
-  path('project/<int:pk>/', ProjectView.as_view()),
+  path('project/<int:pk>/', IndividualProjectView.as_view()),
   path('project/', ProjectView.as_view()),
-  path('task/<int:pk>/', IndividualTaskView.as_view())
+  path('task/<int:pk>/', IndividualTaskView.as_view()),
+  path('document/', DocumentAPIView.as_view()),
+  path('document/<int:pk>/', IndividualDocumentAPIView.as_view())
 ]
+
+

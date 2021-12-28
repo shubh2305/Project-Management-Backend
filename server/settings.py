@@ -15,7 +15,7 @@ from pathlib import Path
 from datetime import timedelta
 
 import django_heroku
-
+import os
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -159,5 +159,8 @@ AUTH_USER_MODEL = 'users.User'
 
 CORS_ALLOW_ALL_ORIGINS = True # If this is used then `CORS_ALLOWED_ORIGINS` will not have any effect
 CORS_ALLOW_CREDENTIALS = True
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 django_heroku.settings(locals())
